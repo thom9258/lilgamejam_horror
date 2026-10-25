@@ -1,7 +1,6 @@
 [requires]
 glm/1.0.1
-cpr/1.14.2
-glaze/8.0.0
+assimp/6.0.2
 
 [generators]
 CMakeDeps

@@ -6,47 +6,50 @@
 #include <bubble/internal/glm.hpp>
 #include <bubble/internal/sdl.hpp>
 
+#include "source/model_loader.hpp"
+
 #include <print>
 
-std::pair<std::vector<bubble::Vertex>, std::vector<bubble::Index>>
-generateIndexedCube() {
+static auto error_texture = std::optional<bubble::TextureRef>{};
 
-  std::vector<bubble::Vertex> vertices = {
-      {{-0.5f, -0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
-      {{0.5f, -0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
-      {{0.5f, 0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}},
-      {{-0.5f, 0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}},
+auto find_material(std::string_view name, std::span<Material> materials)
+    -> Material * {
 
-      {{0.5f, -0.5f, -0.5f}, {0.0f, 0.0f, -1.0f}, {0.0f, 1.0f}},
-      {{-0.5f, -0.5f, -0.5f}, {0.0f, 0.0f, -1.0f}, {1.0f, 1.0f}},
-      {{-0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, -1.0f}, {1.0f, 0.0f}},
-      {{0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, -1.0f}, {0.0f, 0.0f}},
+  for (auto &material : materials) {
+    if (material.name == name) {
+      return &material;
+    }
+  }
+  return nullptr;
+}
 
-      {{-0.5f, -0.5f, -0.5f}, {-1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
-      {{-0.5f, -0.5f, 0.5f}, {-1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
-      {{-0.5f, 0.5f, 0.5f}, {-1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
-      {{-0.5f, 0.5f, -0.5f}, {-1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+auto draw_model(Model &model, glm::mat4 parent_transform,
+                std::span<Material> materials) -> void {
+  const auto transform = model.transform * parent_transform;
+  for (auto &mesh : model.meshes) {
+    if (!mesh.mesh.has_value()) {
+      continue;
+    }
 
-      {{0.5f, -0.5f, 0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
-      {{0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
-      {{0.5f, 0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
-      {{0.5f, 0.5f, 0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+    const auto *material = find_material(mesh.material_name, materials);
+    if (material == nullptr) {
+      bubble::draw_textured(transform, mesh.mesh.value(),
+                            error_texture.value());
+    } else {
+      const auto texture = material->diffuse.value_or(error_texture.value());
+      bubble::draw_textured(transform, mesh.mesh.value(), texture);
+    }
+  }
 
-      {{-0.5f, 0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}},
-      {{0.5f, 0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}},
-      {{0.5f, 0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
-      {{-0.5f, 0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
+  for (auto &child : model.children) {
+    draw_model(child, transform, materials);
+  }
+}
 
-      {{-0.5f, -0.5f, -0.5f}, {0.0f, -1.0f, 0.0f}, {0.0f, 1.0f}},
-      {{0.5f, -0.5f, -0.5f}, {0.0f, -1.0f, 0.0f}, {1.0f, 1.0f}},
-      {{0.5f, -0.5f, 0.5f}, {0.0f, -1.0f, 0.0f}, {1.0f, 0.0f}},
-      {{-0.5f, -0.5f, 0.5f}, {0.0f, -1.0f, 0.0f}, {0.0f, 0.0f}}};
-
-  std::vector<bubble::Index> indices = {
-      0,  1,  2,  2,  3,  0,  4,  5,  6,  6,  7,  4,  8,  9,  10, 10, 11, 8,
-      12, 13, 14, 14, 15, 12, 16, 17, 18, 18, 19, 16, 20, 21, 22, 22, 23, 20};
-
-  return {vertices, indices};
+auto draw_renderable(Renderable &renderable, glm::mat4 transform) -> void {
+  if (renderable.root.has_value()) {
+    draw_model(renderable.root.value(), transform, renderable.materials);
+  }
 }
 
 int main(int argc, char **argv) {
@@ -69,19 +72,18 @@ int main(int argc, char **argv) {
                  init_info.width, init_info.height, duration.value().count());
   }
 
-  auto [cube_vertices, cube_indices] = generateIndexedCube();
-  auto cube_mesh = bubble::create_mesh(cube_vertices, cube_indices);
-  if (!cube_mesh.has_value()) {
+  auto fox = load_renderable("/home/th/Assets/Fox/glTF/Fox.gltf");
+  if (!fox.has_value()) {
+    std::println("model load error: '{}'", fox.error());
     return 1;
   }
+
+  std::println("fox textures: {}", fox->materials.size());
 
   bubble::set_clearcolor(bubble::color::pleasant_blue);
 
   auto camera =
       bubble::Camera(glm::vec3(0.0f, 0.0f, -3.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-
-  const auto cube_location = glm::scale(glm::mat4(1.0f), glm::vec3(0.5f));
-  const auto cube_color = bubble::color::ugly_pink;
 
   auto error_bitmap = bubble::Bitmap(64, 64, bubble::Color(255, 255, 0, 255));
   for (std::size_t i = 0; i < 32; i++) {
@@ -96,7 +98,7 @@ int main(int argc, char **argv) {
     }
   }
 
-  const auto error_texture = bubble::create_texture(error_bitmap);
+  error_texture = bubble::create_texture(error_bitmap);
 
   auto button_focus = bubble::input::Button(SDLK_f);
   auto axis_x = bubble::input::Axis(SDLK_d, SDLK_a);
@@ -141,11 +143,8 @@ int main(int argc, char **argv) {
     }
 
     bubble::set_camera(camera);
-    bubble::draw_flatcolor(cube_location, *cube_mesh, cube_color);
 
-    bubble::draw_textured(
-        glm::translate(cube_location, glm::vec3(2.0f, 0.0f, 0.0f)), *cube_mesh,
-        error_texture.value());
+    draw_renderable(fox.value(), glm::scale(glm::mat4(1.0f), glm::vec3(0.02f)));
 
     bubble::end_frame();
   }
