@@ -1,0 +1,11 @@
+[requires]
+glm/1.0.1
+cpr/1.14.2
+glaze/8.0.0
+
+[generators]
+CMakeDeps
+CMakeToolchain
+
+[layout]
+cmake_layout
