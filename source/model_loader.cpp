@@ -151,12 +151,12 @@ auto load_material(std::filesystem::path basedir, aiMaterial *aimaterial)
   if (channels == 4) {
     std::memcpy(bitmap.pixels(), pixels, width * height * channels);
   } else if (channels == 3) {
-      for (std::size_t i = 0; i < width * height; i++) {
-          const auto r = pixels[i*3+0]; 
-          const auto g = pixels[i*3+1]; 
-          const auto b = pixels[i*3+2]; 
-          bitmap.pixels()[i] = bubble::Color{r, g, b, 255};
-      }
+    for (std::size_t i = 0; i < width * height; i++) {
+      const auto r = pixels[i * 3 + 0];
+      const auto g = pixels[i * 3 + 1];
+      const auto b = pixels[i * 3 + 2];
+      bitmap.pixels()[i] = bubble::Color{r, g, b, 255};
+    }
   } else {
     return std::unexpected(std::format("invalid channels: {}", channels));
   }
@@ -175,19 +175,12 @@ auto load_model(const aiScene *aiscene, aiNode *ainode,
   for (unsigned int i = 0; i < ainode->mNumMeshes; i++) {
     aiMesh *aimesh = aiscene->mMeshes[ainode->mMeshes[i]];
 
-    auto loaded_mesh = load_mesh(aiscene, aimesh);
-
-    if (loaded_mesh.has_value()) {
-      model.meshes.push_back(loaded_mesh.value());
-    }
-
     auto *aimaterial = aiscene->mMaterials[aimesh->mMaterialIndex];
     if (aimaterial != nullptr) {
       const auto material_name = std::string(aimaterial->GetName().C_Str());
       const auto *existing = util::find_material(material_name, materials);
 
       if (existing == nullptr) {
-        std::println("material did not exist {}", material_name);
         auto loaded_material = load_material(basedir, aimaterial);
         if (loaded_material.has_value()) {
           materials.push_back(std::move(*loaded_material));
@@ -195,6 +188,11 @@ auto load_model(const aiScene *aiscene, aiNode *ainode,
           return std::unexpected(loaded_material.error());
         }
       }
+    }
+
+    auto loaded_mesh = load_mesh(aiscene, aimesh);
+    if (loaded_mesh.has_value()) {
+      model.meshes.push_back(loaded_mesh.value());
     }
   }
 
@@ -212,9 +210,11 @@ auto load_model(const aiScene *aiscene, aiNode *ainode,
 
 auto load_renderable(std::filesystem::path path)
     -> std::expected<Renderable, std::string> {
-  const auto flags = aiProcess_Triangulate | aiProcess_GenNormals |
-                     aiProcess_FlipUVs | aiProcess_FixInfacingNormals |
-                     aiProcess_LimitBoneWeights;
+  // const auto flags = aiProcess_Triangulate | aiProcess_GenNormals |
+  //                    aiProcess_FlipUVs | aiProcess_FixInfacingNormals |
+  //                    aiProcess_LimitBoneWeights;
+
+  const auto flags = aiProcess_Triangulate;
 
   auto importer = Assimp::Importer{};
   const auto *aiscene = importer.ReadFile(path, flags);

@@ -72,18 +72,16 @@ int main(int argc, char **argv) {
                  init_info.width, init_info.height, duration.value().count());
   }
 
-  auto fox = load_renderable("/home/th/Assets/Fox/glTF/Fox.gltf");
-  if (!fox.has_value()) {
-    std::println("model load error: '{}'", fox.error());
+  auto spaceship = load_renderable("/home/th/Projects/lilgamejam_horror/resources/models/spaceship_interior_export/spaceship_interior.gltf");
+  if (!spaceship.has_value()) {
+    std::println("model load error: '{}'", spaceship.error());
     return 1;
   }
-
-  std::println("fox textures: {}", fox->materials.size());
 
   bubble::set_clearcolor(bubble::color::pleasant_blue);
 
   auto camera =
-      bubble::Camera(glm::vec3(0.0f, 0.0f, -3.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+      bubble::Camera(glm::vec3(0.0f, 2.0f, -3.0f), glm::vec3(0.0f, 0.0f, 1.0f));
 
   auto error_bitmap = bubble::Bitmap(64, 64, bubble::Color(255, 255, 0, 255));
   for (std::size_t i = 0; i < 32; i++) {
@@ -144,7 +142,7 @@ int main(int argc, char **argv) {
 
     bubble::set_camera(camera);
 
-    draw_renderable(fox.value(), glm::scale(glm::mat4(1.0f), glm::vec3(0.02f)));
+    draw_renderable(spaceship.value(), glm::scale(glm::mat4(1.0f), glm::vec3(1.0f)));
 
     bubble::end_frame();
   }
