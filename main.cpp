@@ -6,7 +6,10 @@
 #include <bubble/internal/glm.hpp>
 #include <bubble/internal/sdl.hpp>
 
+#include "source/character_mover.hpp"
 #include "source/model_loader.hpp"
+
+#include <box3d/box3d.h>
 
 #include <print>
 
@@ -56,6 +59,29 @@ int main(int argc, char **argv) {
   static_cast<void>(argc);
   static_cast<void>(argv);
 
+  b3WorldDef worldDef = b3DefaultWorldDef();
+  worldDef.gravity = (b3Vec3){0.0f, -10.0f, 0.0f};
+  b3WorldId worldId = b3CreateWorld(&worldDef);
+
+  b3BodyDef groundBodyDef = b3DefaultBodyDef();
+  groundBodyDef.position = (b3Vec3){0.0f, -10.0f, 0.0f};
+
+  b3BoxHull groundBox = b3MakeBoxHull(50.0f, 10.0f, 50.0f);
+
+  b3BodyId groundId = b3CreateBody(worldId, &groundBodyDef);
+  b3ShapeDef groundShapeDef = b3DefaultShapeDef();
+  b3CreateHullShape(groundId, &groundShapeDef, &groundBox.base);
+
+  // b3BodyDef bodyDef = b3DefaultBodyDef();
+  // bodyDef.type = b3_dynamicBody;
+  // bodyDef.position = (b3Vec3){0.0f, 5.0f, 0.0f};
+  // b3BodyId bodyId = b3CreateBody(worldId, &bodyDef);
+  // b3BoxHull dynamicBox = b3MakeCubeHull(1.0f);
+  // b3ShapeDef shapeDef = b3DefaultShapeDef();
+  // shapeDef.density = 1.0f;
+  // shapeDef.baseMaterial.friction = 0.3f;
+  // b3CreateHullShape(bodyId, &shapeDef, &dynamicBox.base);
+
   bubble::Timer init_timer;
   init_timer.start();
   auto init_info = bubble::InitializeInfo{};
@@ -72,7 +98,9 @@ int main(int argc, char **argv) {
                  init_info.width, init_info.height, duration.value().count());
   }
 
-  auto spaceship = load_renderable("/home/th/Projects/lilgamejam_horror/resources/models/spaceship_interior_export/spaceship_interior.gltf");
+  auto spaceship =
+      load_renderable("/home/th/Projects/lilgamejam_horror/resources/models/"
+                      "spaceship_interior_export/spaceship_interior.gltf");
   if (!spaceship.has_value()) {
     std::println("model load error: '{}'", spaceship.error());
     return 1;
@@ -81,7 +109,9 @@ int main(int argc, char **argv) {
   bubble::set_clearcolor(bubble::color::pleasant_blue);
 
   auto camera =
-      bubble::Camera(glm::vec3(0.0f, 2.0f, -3.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+      bubble::Camera(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+
+  auto character_mover = CharacterMover(worldId, b3Pos(0.0f, 1.0f, 0.0f));
 
   auto error_bitmap = bubble::Bitmap(64, 64, bubble::Color(255, 255, 0, 255));
   for (std::size_t i = 0; i < 32; i++) {
@@ -135,14 +165,25 @@ int main(int argc, char **argv) {
     axis_z.update();
     const auto move_direction =
         glm::normalize(glm::vec3(axis_x.value(), 0.0f, axis_z.value()));
-    if (glm::length(move_direction) > 0.1f) {
-      const auto move_speed = 2.0f;
-      camera.translate_local(move_direction * deltatime * move_speed);
-    }
+
+    float timeStep = 1.0f / 60.0f;
+    int subStepCount = 4;
+    b3World_Step(worldId, timeStep, subStepCount);
+
+    bool clipVelocity = false;
+    b3Vec2 throttle = b3Vec2(move_direction.z, move_direction.x);
+    b3Vec3 forward =
+        b3Vec3(camera.forward().x, camera.forward().y, camera.forward().z);
+    b3Vec3 right = b3Vec3(camera.right().x, camera.right().y, camera.right().z);
+    character_mover.Step(nullptr, 0, deltatime, clipVelocity, throttle, forward, right);
+
+    b3Vec3 position = character_mover.m_transform.p;
+    camera.set_position(glm::vec3(position.x, position.y, position.z));
 
     bubble::set_camera(camera);
 
-    draw_renderable(spaceship.value(), glm::scale(glm::mat4(1.0f), glm::vec3(1.0f)));
+    draw_renderable(spaceship.value(),
+                    glm::scale(glm::mat4(1.0f), glm::vec3(1.0f)));
 
     bubble::end_frame();
   }

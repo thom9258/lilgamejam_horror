@@ -1,6 +1,7 @@
 [requires]
 glm/1.0.1
 assimp/6.0.2
+box3d/0.1.0
 
 [generators]
 CMakeDeps
